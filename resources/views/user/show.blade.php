@@ -26,17 +26,8 @@
                     <th>Alamat</th>
                     <th>Action</th>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td>1</td>
-                        <td>Budi</td>
-                        <td>budi@gamil.com</td>
-                        <td>Padang</td>
-                        <td>
-                            <a href="#" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></a>
-                            <a href="#" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></a>
-                        </td>
-                    </tr>
+                <tbody class="data-user">
+
                 </tbody>
             </table>
         </div>
@@ -77,6 +68,23 @@
         </div>
     </div>
 </div>
+<!-- konfirmasi delete -->
+<div class="modal fade" id="modalDelete" tabindex="-1" role="dialog" aria-labelledby="modelTitleId" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Konfirmasi</h5>
+            </div>
+            <div class="modal-body">
+                Yakin akan hapus data ini ?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Tidak</button>
+                <button type="button" class="btn btn-primary proses-delete">Ya</button>
+            </div>
+        </div>
+    </div>
+</div>
 <script src="https://code.jquery.com/jquery-3.6.0.js" integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk="
     crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
@@ -97,10 +105,11 @@
 <!-- Add Firebase products that you want to use -->
 <script src="https://www.gstatic.com/firebasejs/8.5.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.5.0/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.5.0/firebase-database.js"></script>
 
 <script>
-     // digunakan untuk inisiasi firebase
-     var firebaseConfig = {
+    // digunakan untuk inisiasi firebase
+    var firebaseConfig = {
         apiKey: "{{ config('services.firebase.api_key') }}",
         authDomain: "{{ config('services.firebase.auth_domain') }}",
         databaseURL: "{{ config('services.firebase.database_url') }}",
@@ -113,10 +122,31 @@
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-    // var database=firebase.database();
+    var database = firebase.database();
+    var endIndex = 0;
+
     // menampilkan data
-    var Index=0;
-    firebase.database
+    firebase.database().ref('users/').on('value', function (snapshot) {
+        let value = snapshot.val();
+        let html = [];
+        let number = 1;
+        $.each(value, function (index, value) {
+            if (value) {
+                html.push(` <tr>
+                        <td>` + number++ + `</td>
+                        <td>` + value.nama + `</td>
+                        <td>` + value.email + `</td>
+                        <td>` + value.alamat + `</td>
+                        <td>
+                            <a href="#" class="btn btn-danger btn-sm delete" data-id="` + index + `"><i class="fa fa-trash"></i></a>
+                            <a href="#" class="btn btn-warning btn-sm update" data-id="` + index + `"><i class="fa fa-edit"></i></a>
+                        </td>
+                    </tr>`)
+            }
+            endIndex = index;
+        });
+        $('.data-user').html(html);
+    })
     // untuk menampilkan modal tambah
     $('.tambah').click(function (e) {
         $('#type').val('simpan');
@@ -127,10 +157,11 @@
         e.preventDefault();
         $('.text-muted').text('');
         // ambil value imput
+        let type = $('#type').val();
         let email = $('#email').val();
         let nama = $('#nama').val();
         let alamat = $('#alamat').val();
-        let idData=Index+1;
+        let idData = endIndex + 1;
         if (email == "") {
             $('.e-email').text('Email Tidak Boleh Kosong')
         }
@@ -140,13 +171,57 @@
         if (alamat == "") {
             $('.e-alamat').text('Alamat Tidak Boleh Kosong')
         }
-        if (alamat !== "" && nama !== "" && email !== "") {
-            firebase.database().ref('users/'+idData).set({
-                email:email,nama:nama,alamat:alamat
-            })
-            Index=idData;
+        if (type == 'simpan') {
+            if (alamat !== "" && nama !== "" && email !== "") {
+                firebase.database().ref('users/' + idData).set({
+                    email: email,
+                    nama: nama,
+                    alamat: alamat
+                })
+                endIndex = idData;
+            }
+
+        } else if (type == 'edit') {
+            console.log(localStorage.getItem('id'));
+            let updates = {};
+            updates['users/' + localStorage.getItem('id')] = {
+                email: email,
+                nama: nama,
+                alamat: alamat
+            }
+            firebase.database().ref().update(updates);
         }
 
+        $('#modalTambah').modal('hide');
+
+    });
+    // perintah menampilkan data yang akan di update
+    $('body').on('click', '.update', function (e) {
+        e.preventDefault();
+        let id = $(this).attr('data-id');
+        localStorage.setItem('id', id);
+        firebase.database().ref('users/' + id).on('value', function (snapshot) {
+            let values = snapshot.val();
+            $('#email').val(values.email);
+            $('#nama').val(values.nama);
+            $('#alamat').text(values.alamat);
+            $('#type').val('edit');
+            $('#modalTambah').modal('show');
+        });
+    });
+    // perintah menampilkan konfirmasi hapus
+    $("body").on('click', '.delete', function (e) {
+        e.preventDefault();
+        let id = $(this).attr('data-id');
+        localStorage.setItem('id', id);
+        $('#modalDelete').modal('show');
+    });
+    // perintah hapus data
+    $(".proses-delete").click(function (e) {
+        e.preventDefault();
+        let id = localStorage.getItem('id');
+        firebase.database().ref('users/'+id).remove();
+        $('#modalDelete').modal('hide');
     });
 
 </script>
